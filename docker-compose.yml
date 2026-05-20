@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: prn232_sql
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=123456aA@
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 123456aA@ -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: PRN232.LMS.API/Dockerfile
+    container_name: prn232_api
+    depends_on:
+      - sqlserver
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DisableHttpsRedirection=true
+      - ConnectionStrings__MyCnn=Server=sqlserver;Database=PRN232_LAB1;User Id=sa;Password=123456aA@;TrustServerCertificate=true;Encrypt=false
+    ports:
+      - "5287:8080"
