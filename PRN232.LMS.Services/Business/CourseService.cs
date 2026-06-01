@@ -41,14 +41,14 @@ public class CourseService : ICourseService
             CourseName = businessModel.CourseName,
             SemesterId = businessModel.SemesterId,
             SemesterName = course.Semester?.SemesterName,
-            Enrollments = course.Enrollments.Select(e => new CourseEnrollmentModel
-            {
-                EnrollmentId = e.EnrollmentId,
-                StudentId = e.StudentId,
-                StudentName = e.Student?.FullName,
-                Status = e.Status,
-                EnrollDate = e.EnrollDate
-            }).ToList()
+            //Enrollments = course.Enrollments.Select(e => new CourseEnrollmentModel
+            //{
+            //    EnrollmentId = e.EnrollmentId,
+            //    StudentId = e.StudentId,
+            //    StudentName = e.Student?.FullName,
+            //    Status = e.Status,
+            //    EnrollDate = e.EnrollDate
+            //}).ToList()
         };
     }
 
@@ -150,14 +150,14 @@ public class CourseService : ICourseService
             CourseName = businessModel.CourseName,
             SemesterId = businessModel.SemesterId,
             SemesterName = course.Semester?.SemesterName,
-            Enrollments = course.Enrollments.Select(e => new CourseEnrollmentModel
-            {
-                EnrollmentId = e.EnrollmentId,
-                StudentId = e.StudentId,
-                StudentName = e.Student?.FullName,
-                Status = e.Status,
-                EnrollDate = e.EnrollDate
-            }).ToList()
+            //Enrollments = course.Enrollments.Select(e => new CourseEnrollmentModel
+            //{
+            //    EnrollmentId = e.EnrollmentId,
+            //    StudentId = e.StudentId,
+            //    StudentName = e.Student?.FullName,
+            //    Status = e.Status,
+            //    EnrollDate = e.EnrollDate
+            //}).ToList()
         };
     }
 }

@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Mvc;
 using PRN232.LMS.API.Models;
 using PRN232.LMS.API.Extensions;
 using PRN232.LMS.Services.Models.CourseModels;
+using PRN232.LMS.Services.Models.EnrollmentModels;
 using PRN232.LMS.Services.Interfaces;
 using PRN232.LMS.Repositories.Models.QueryModels;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace PRN232.LMS.API.Controllers;
@@ -15,10 +17,12 @@ namespace PRN232.LMS.API.Controllers;
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
+    private readonly IEnrollmentService _enrollmentService;
 
-    public CoursesController(ICourseService courseService)
+    public CoursesController(ICourseService courseService, IEnrollmentService enrollmentService)
     {
         _courseService = courseService;
+        _enrollmentService = enrollmentService;
     }
 
     [HttpGet("{id}")]
@@ -41,6 +45,29 @@ public class CoursesController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError,
                 ApiResponse<object>.Fail("Failed to retrieve course.", ex.Message));
+        }
+    }
+
+    [HttpGet("{id}/enrollments")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnrollmentResponseModel>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCourseEnrollments(int id)
+    {
+        try
+        {
+            var enrollments = await _enrollmentService.GetEnrollmentsByCourseAsync(id);
+
+            if (enrollments == null)
+            {
+                return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
+            }
+
+            return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Course enrollments retrieved successfully"));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                ApiResponse<object>.Fail("Failed to retrieve course enrollments.", ex.Message));
         }
     }
 

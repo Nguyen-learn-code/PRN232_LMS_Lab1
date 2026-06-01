@@ -36,6 +36,30 @@ public class EnrollmentService : IEnrollmentService
         return MapEnrollment(enrollment);
     }
 
+    public async Task<IEnumerable<EnrollmentResponseModel>?> GetEnrollmentsByCourseAsync(int courseId)
+    {
+        var course = await _courseRepo.GetByIdAsync(courseId);
+
+        if (course == null)
+        {
+            return null;
+        }
+
+        return course.Enrollments.Select(MapEnrollment).ToList();
+    }
+
+    public async Task<IEnumerable<EnrollmentResponseModel>?> GetEnrollmentsByStudentAsync(int studentId)
+    {
+        var student = await _studentRepo.GetByIdAsync(studentId);
+
+        if (student == null)
+        {
+            return null;
+        }
+
+        return student.Enrollments.Select(MapEnrollment).ToList();
+    }
+
     public async Task<PagedResult<object>> GetEnrollmentsAsync(QueryParameters parameters)
     {
         var result = await _enrollmentRepo.GetListAsync(

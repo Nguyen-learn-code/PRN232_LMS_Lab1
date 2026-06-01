@@ -41,14 +41,14 @@ public class StudentService : IStudentService
             FullName = businessModel.FullName,
             Email = businessModel.Email,
             DateOfBirth = businessModel.DateOfBirth,
-            Enrollments = student.Enrollments.Select(e => new StudentEnrollmentModel
-            {
-                EnrollmentId = e.EnrollmentId,
-                CourseId = e.CourseId,
-                CourseName = e.Course?.CourseName,
-                Status = e.Status,
-                EnrollDate = e.EnrollDate
-            }).ToList()
+            //Enrollments = student.Enrollments.Select(e => new StudentEnrollmentModel
+            //{
+            //    EnrollmentId = e.EnrollmentId,
+            //    CourseId = e.CourseId,
+            //    CourseName = e.Course?.CourseName,
+            //    Status = e.Status,
+            //    EnrollDate = e.EnrollDate
+            //}).ToList()
         };
     }
 
@@ -143,14 +143,14 @@ public class StudentService : IStudentService
             FullName = businessModel.FullName,
             Email = businessModel.Email,
             DateOfBirth = businessModel.DateOfBirth,
-            Enrollments = student.Enrollments.Select(e => new StudentEnrollmentModel
-            {
-                EnrollmentId = e.EnrollmentId,
-                CourseId = e.CourseId,
-                CourseName = e.Course?.CourseName,
-                Status = e.Status,
-                EnrollDate = e.EnrollDate
-            }).ToList()
+            //Enrollments = student.Enrollments.Select(e => new StudentEnrollmentModel
+            //{
+            //    EnrollmentId = e.EnrollmentId,
+            //    CourseId = e.CourseId,
+            //    CourseName = e.Course?.CourseName,
+            //    Status = e.Status,
+            //    EnrollDate = e.EnrollDate
+            //}).ToList()
         };
     }
 }

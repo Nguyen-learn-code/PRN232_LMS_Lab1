@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using PRN232.LMS.API.Models;
 using PRN232.LMS.API.Extensions;
 using PRN232.LMS.Services.Models.StudentModels;
+using PRN232.LMS.Services.Models.EnrollmentModels;
 using PRN232.LMS.Services.Interfaces;
 using PRN232.LMS.Repositories.Models.QueryModels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
 
 namespace PRN232.LMS.API.Controllers;
 
@@ -15,10 +17,12 @@ namespace PRN232.LMS.API.Controllers;
 public class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
+    private readonly IEnrollmentService _enrollmentService;
 
-    public StudentsController(IStudentService studentService)
+    public StudentsController(IStudentService studentService, IEnrollmentService enrollmentService)
     {
         _studentService = studentService;
+        _enrollmentService = enrollmentService;
     }
 
     [HttpGet("{id}")]
@@ -43,6 +47,29 @@ public class StudentsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError,
                 ApiResponse<object>.Fail("Failed to retrieve student.", ex.Message));
+        }
+    }
+
+    [HttpGet("{id}/enrollments")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnrollmentResponseModel>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStudentEnrollments(int id)
+    {
+        try
+        {
+            var enrollments = await _enrollmentService.GetEnrollmentsByStudentAsync(id);
+
+            if (enrollments == null)
+            {
+                return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
+            }
+
+            return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Student enrollments retrieved successfully"));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                ApiResponse<object>.Fail("Failed to retrieve student enrollments.", ex.Message));
         }
     }
 
