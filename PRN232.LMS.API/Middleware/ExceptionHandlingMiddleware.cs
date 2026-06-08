@@ -39,11 +39,14 @@ public class ExceptionHandlingMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
 
-        var message = statusCode == HttpStatusCode.InternalServerError 
-            ? "An internal server error occurred." 
-            : exception.Message;
-
-        var response = ApiResponse<object>.Fail(message);
+        var response = new
+        {
+            success = false,
+            message = statusCode == HttpStatusCode.InternalServerError 
+                ? "Internal server error" 
+                : exception.Message,
+            errors = (object?)null
+        };
 
         return context.Response.WriteAsJsonAsync(response);
     }

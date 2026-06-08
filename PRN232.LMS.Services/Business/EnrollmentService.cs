@@ -38,7 +38,9 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<IEnumerable<EnrollmentResponseModel>?> GetEnrollmentsByCourseAsync(int courseId)
     {
-        var course = await _courseRepo.GetByIdAsync(courseId);
+        var course = await _courseRepo.GetByIdWithIncludesAsync(
+            c => c.CourseId == courseId,
+            "Enrollments", "Enrollments.Student", "Enrollments.Course");
 
         if (course == null)
         {
@@ -50,7 +52,9 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<IEnumerable<EnrollmentResponseModel>?> GetEnrollmentsByStudentAsync(int studentId)
     {
-        var student = await _studentRepo.GetByIdAsync(studentId);
+        var student = await _studentRepo.GetByIdWithIncludesAsync(
+            s => s.StudentId == studentId,
+            "Enrollments", "Enrollments.Course", "Enrollments.Student");
 
         if (student == null)
         {

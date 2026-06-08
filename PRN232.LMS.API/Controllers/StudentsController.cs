@@ -9,11 +9,16 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
 
 namespace PRN232.LMS.API.Controllers;
 
 [ApiController]
-[Route("api/students")] // RESTful naming rule
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/students")]
+[Authorize] // All student endpoints require a valid JWT by default
 public class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
@@ -25,101 +30,80 @@ public class StudentsController : ControllerBase
         _enrollmentService = enrollmentService;
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}", Name = "GetStudentById")]
     [ProducesResponseType(typeof(ApiResponse<StudentResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetStudentById(int id)
+    public async Task<IActionResult> GetStudentById([FromRoute] int id, [FromHeader(Name = "X-Request-Id")] string? requestId)
     {
-        try
+        // Demonstrate header usage
+        if (!string.IsNullOrEmpty(requestId))
         {
-            var student = await _studentService.GetStudentByIdAsync(id);
-
-            if (student == null)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<StudentResponseModel>.Ok(student));
+            Response.Headers.Append("X-Request-Id", requestId);
         }
-        catch (Exception ex)
+
+        var student = await _studentService.GetStudentByIdAsync(id);
+
+        if (student == null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve student.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<StudentResponseModel>.Ok(student));
     }
 
-    [HttpGet("{id}/enrollments")]
+    [HttpGet("{id:int}/enrollments")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnrollmentResponseModel>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStudentEnrollments(int id)
+    public async Task<IActionResult> GetStudentEnrollments([FromRoute] int id)
     {
-        try
-        {
-            var enrollments = await _enrollmentService.GetEnrollmentsByStudentAsync(id);
+        var enrollments = await _enrollmentService.GetEnrollmentsByStudentAsync(id);
 
-            if (enrollments == null)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Student enrollments retrieved successfully"));
-        }
-        catch (Exception ex)
+        if (enrollments == null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve student enrollments.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Student enrollments retrieved successfully"));
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<StudentResponseModel>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetStudents([FromQuery] QueryParameters parameters)
+    public async Task<IActionResult> GetStudents([FromQuery] StudentQueryRequest request)
     {
-        try
-        {
-            var result = await _studentService.GetStudentsAsync(parameters);
-            return result.ToPagedResponse();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve students.", ex.Message));
-        }
+        var result = await _studentService.GetStudentsAsync(request);
+        return result.ToPagedResponse();
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")] // Only Admins can create students
     [ProducesResponseType(typeof(ApiResponse<StudentResponseModel>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CreateStudent([FromBody] StudentCreateModel model)
+    public async Task<IActionResult> CreateStudent([FromBody] CreateStudentRequest model)
     {
         try
         {
             var student = await _studentService.CreateStudentAsync(model);
-            return CreatedAtAction(nameof(GetStudentById), new { id = student.StudentId }, ApiResponse<StudentResponseModel>.Ok(student, "Student created successfully"));
+            return CreatedAtRoute("GetStudentById", new { id = student.StudentId }, ApiResponse<StudentResponseModel>.Ok(student, "Student created successfully"));
         }
         catch (ArgumentException ex)
         {
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to create student.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to create student.", ex.Message));
-        }
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")] // Only Admins can update students
     [ProducesResponseType(typeof(ApiResponse<StudentResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateStudent(int id, [FromBody] StudentUpdateModel model)
+    public async Task<IActionResult> UpdateStudent([FromRoute] int id, [FromBody] UpdateStudentRequest model)
     {
         try
         {
@@ -137,35 +121,23 @@ public class StudentsController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to update student.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to update student.", ex.Message));
-        }
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")] // Only Admins can delete students (role-based authorization requirement)
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteStudent(int id)
+    public async Task<IActionResult> DeleteStudent([FromRoute] int id)
     {
-        try
-        {
-            var deleted = await _studentService.DeleteStudentAsync(id);
+        var deleted = await _studentService.DeleteStudentAsync(id);
 
-            if (!deleted)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<object>.Ok(new { }, "Student deleted successfully"));
-        }
-        catch (Exception ex)
+        if (!deleted)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to delete student.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Student with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<object>.Ok(new { }, "Student deleted successfully"));
     }
 }

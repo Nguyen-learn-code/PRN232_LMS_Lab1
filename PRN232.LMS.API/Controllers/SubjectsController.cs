@@ -7,11 +7,17 @@ using PRN232.LMS.Repositories.Models.QueryModels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
 
 namespace PRN232.LMS.API.Controllers;
 
 [ApiController]
-[Route("api/subjects")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/subjects")]
+[Authorize]
 public class SubjectsController : ControllerBase
 {
     private readonly ISubjectService _subjectService;
@@ -21,29 +27,21 @@ public class SubjectsController : ControllerBase
         _subjectService = subjectService;
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<SubjectResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetSubjectById(int id)
+    public async Task<IActionResult> GetSubjectById([FromRoute] int id)
     {
-        try
-        {
-            var subject = await _subjectService.GetSubjectByIdAsync(id);
+        var subject = await _subjectService.GetSubjectByIdAsync(id);
 
-            if (subject == null)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Subject with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<SubjectResponseModel>.Ok(subject));
-        }
-        catch (Exception ex)
+        if (subject == null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve subject.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Subject with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<SubjectResponseModel>.Ok(subject));
     }
 
     [HttpGet]
@@ -52,19 +50,12 @@ public class SubjectsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetSubjects([FromQuery] QueryParameters parameters)
     {
-        try
-        {
-            var result = await _subjectService.GetSubjectsAsync(parameters);
-            return result.ToPagedResponse();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve subjects.", ex.Message));
-        }
+        var result = await _subjectService.GetSubjectsAsync(parameters);
+        return result.ToPagedResponse();
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<SubjectResponseModel>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
@@ -73,26 +64,22 @@ public class SubjectsController : ControllerBase
         try
         {
             var subject = await _subjectService.CreateSubjectAsync(model);
-            return CreatedAtAction(nameof(GetSubjectById), new { id = subject.SubjectId }, ApiResponse<SubjectResponseModel>.Ok(subject, "Subject created successfully"));
+            return CreatedAtAction(nameof(GetSubjectById), new { id = subject.SubjectId, version = HttpContext.GetRequestedApiVersion()?.ToString() }, ApiResponse<SubjectResponseModel>.Ok(subject, "Subject created successfully"));
         }
         catch (ArgumentException ex)
         {
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to create subject.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to create subject.", ex.Message));
-        }
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<SubjectResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateSubject(int id, [FromBody] SubjectUpdateModel model)
+    public async Task<IActionResult> UpdateSubject([FromRoute] int id, [FromBody] SubjectUpdateModel model)
     {
         try
         {
@@ -110,35 +97,23 @@ public class SubjectsController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to update subject.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to update subject.", ex.Message));
-        }
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteSubject(int id)
+    public async Task<IActionResult> DeleteSubject([FromRoute] int id)
     {
-        try
-        {
-            var deleted = await _subjectService.DeleteSubjectAsync(id);
+        var deleted = await _subjectService.DeleteSubjectAsync(id);
 
-            if (!deleted)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Subject with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<object>.Ok(new { }, "Subject deleted successfully"));
-        }
-        catch (Exception ex)
+        if (!deleted)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to delete subject.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Subject with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<object>.Ok(new { }, "Subject deleted successfully"));
     }
 }

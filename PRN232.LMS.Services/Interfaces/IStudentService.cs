@@ -8,7 +8,7 @@ public interface IStudentService
 {
     Task<StudentResponseModel?> GetStudentByIdAsync(int id);
     Task<PagedResult<object>> GetStudentsAsync(QueryParameters parameters);
-    Task<StudentResponseModel> CreateStudentAsync(StudentCreateModel model);
-    Task<StudentResponseModel?> UpdateStudentAsync(int id, StudentUpdateModel model);
+    Task<StudentResponseModel> CreateStudentAsync(CreateStudentRequest model);
+    Task<StudentResponseModel?> UpdateStudentAsync(int id, UpdateStudentRequest model);
     Task<bool> DeleteStudentAsync(int id);
 }

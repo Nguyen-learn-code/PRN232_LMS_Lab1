@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +24,10 @@ public partial class Prn232Lab1Context : DbContext
     public virtual DbSet<Student> Students { get; set; }
 
     public virtual DbSet<Subject> Subjects { get; set; }
+
+    public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +110,31 @@ public partial class Prn232Lab1Context : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.SubjectName).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+            entity.ToTable("User");
+            entity.HasIndex(e => e.Username).IsUnique();
+            entity.Property(e => e.Username).HasMaxLength(50).IsUnicode(false);
+            entity.Property(e => e.PasswordHash).HasMaxLength(255).IsUnicode(false);
+            entity.Property(e => e.Role).HasMaxLength(20).IsUnicode(false);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.TokenId);
+            entity.ToTable("RefreshToken");
+            entity.Property(e => e.Token).HasMaxLength(255).IsUnicode(false);
+            entity.Property(e => e.ExpiryDate).HasColumnType("datetime");
+            entity.Property(e => e.CreatedDate).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.IsRevoked).HasDefaultValue(false);
+
+            entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RefreshToken_User");
         });
 
         OnModelCreatingPartial(modelBuilder);

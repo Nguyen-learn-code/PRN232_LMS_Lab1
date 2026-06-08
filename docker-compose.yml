@@ -25,5 +25,9 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - DisableHttpsRedirection=true
       - ConnectionStrings__MyCnn=Server=sqlserver;Database=PRN232_LAB1;User Id=sa;Password=123456aA@;TrustServerCertificate=true;Encrypt=false
+      - JwtSettings__Secret=Prn232lmsscSuperSecretDefaultKey1234567890!!
+      - JwtSettings__Issuer=LmsServer
+      - JwtSettings__Audience=LmsClient
+      - JwtSettings__ExpiryMinutes=60
     ports:
       - "5287:8080"

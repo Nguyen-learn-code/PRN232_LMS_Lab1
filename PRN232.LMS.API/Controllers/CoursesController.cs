@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using PRN232.LMS.API.Models;
 using PRN232.LMS.API.Extensions;
 using PRN232.LMS.Services.Models.CourseModels;
+using PRN232.LMS.Services.Models.StudentModels;
 using PRN232.LMS.Services.Models.EnrollmentModels;
 using PRN232.LMS.Services.Interfaces;
 using PRN232.LMS.Repositories.Models.QueryModels;
@@ -9,85 +10,98 @@ using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
 
 namespace PRN232.LMS.API.Controllers;
 
 [ApiController]
-[Route("api/courses")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/courses")]
+[Authorize] // All course endpoints require a valid JWT by default
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
     private readonly IEnrollmentService _enrollmentService;
+    private readonly IStudentService _studentService;
 
-    public CoursesController(ICourseService courseService, IEnrollmentService enrollmentService)
+    public CoursesController(
+        ICourseService courseService, 
+        IEnrollmentService enrollmentService,
+        IStudentService studentService)
     {
         _courseService = courseService;
         _enrollmentService = enrollmentService;
+        _studentService = studentService;
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<CourseResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetCourseById(int id)
+    public async Task<IActionResult> GetCourseById([FromRoute] int id)
     {
-        try
-        {
-            var course = await _courseService.GetCourseByIdAsync(id);
+        var course = await _courseService.GetCourseByIdAsync(id);
 
-            if (course == null)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<CourseResponseModel>.Ok(course));
-        }
-        catch (Exception ex)
+        if (course == null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve course.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<CourseResponseModel>.Ok(course));
     }
 
-    [HttpGet("{id}/enrollments")]
+    [HttpGet("{id:int}/enrollments")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnrollmentResponseModel>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetCourseEnrollments(int id)
+    public async Task<IActionResult> GetCourseEnrollments([FromRoute] int id)
     {
-        try
-        {
-            var enrollments = await _enrollmentService.GetEnrollmentsByCourseAsync(id);
+        var enrollments = await _enrollmentService.GetEnrollmentsByCourseAsync(id);
 
-            if (enrollments == null)
+        if (enrollments == null)
+        {
+            return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
+        }
+
+        return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Course enrollments retrieved successfully"));
+    }
+
+    // Nested resource: /api/courses/{courseId}/students
+    [HttpGet("{courseId:int}/students")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<StudentResponseModel>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStudentsByCourse([FromRoute] int courseId)
+    {
+        var enrollments = await _enrollmentService.GetEnrollmentsByCourseAsync(courseId);
+        
+        if (enrollments == null)
+        {
+            return NotFound(ApiResponse<object>.Fail($"Course with ID {courseId} does not exist."));
+        }
+
+        var students = new List<StudentResponseModel>();
+        foreach (var enrollment in enrollments)
+        {
+            var student = await _studentService.GetStudentByIdAsync(enrollment.StudentId);
+            if (student != null)
             {
-                return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
+                students.Add(student);
             }
+        }
 
-            return Ok(ApiResponse<IEnumerable<EnrollmentResponseModel>>.Ok(enrollments, "Course enrollments retrieved successfully"));
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve course enrollments.", ex.Message));
-        }
+        return Ok(ApiResponse<IEnumerable<StudentResponseModel>>.Ok(students, "Students in course retrieved successfully"));
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<CourseResponseModel>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCourses([FromQuery] QueryParameters parameters)
     {
-        try
-        {
-            var result = await _courseService.GetCoursesAsync(parameters);
-            return result.ToPagedResponse();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve courses.", ex.Message));
-        }
+        var result = await _courseService.GetCoursesAsync(parameters);
+        return result.ToPagedResponse();
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")] // Only admins can create courses
     [ProducesResponseType(typeof(ApiResponse<CourseResponseModel>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateCourse([FromBody] CourseCreateModel model)
@@ -102,18 +116,14 @@ public class CoursesController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to create course.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to create course.", ex.Message));
-        }
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")] // Only admins can update courses
     [ProducesResponseType(typeof(ApiResponse<CourseResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateCourse(int id, [FromBody] CourseUpdateModel model)
+    public async Task<IActionResult> UpdateCourse([FromRoute] int id, [FromBody] CourseUpdateModel model)
     {
         try
         {
@@ -129,35 +139,23 @@ public class CoursesController : ControllerBase
         catch (ArgumentException ex)
         {
             return StatusCode(StatusCodes.Status400BadRequest,
-                ApiResponse<object>.Fail("Failed to create course.", ex.Message));
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
                 ApiResponse<object>.Fail("Failed to update course.", ex.Message));
         }
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")] // Only admins can delete courses
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteCourse(int id)
+    public async Task<IActionResult> DeleteCourse([FromRoute] int id)
     {
-        try
-        {
-            var deleted = await _courseService.DeleteCourseAsync(id);
+        var deleted = await _courseService.DeleteCourseAsync(id);
 
-            if (!deleted)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<object>.Ok(new { }, "Course deleted successfully"));
-        }
-        catch (Exception ex)
+        if (!deleted)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to delete course.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Course with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<object>.Ok(new { }, "Course deleted successfully"));
     }
 }

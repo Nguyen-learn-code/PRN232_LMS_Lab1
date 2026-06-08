@@ -7,11 +7,17 @@ using PRN232.LMS.Repositories.Models.QueryModels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
 
 namespace PRN232.LMS.API.Controllers;
 
 [ApiController]
-[Route("api/enrollments")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/enrollments")]
+[Authorize]
 public class EnrollmentsController : ControllerBase
 {
     private readonly IEnrollmentService _enrollmentService;
@@ -21,29 +27,21 @@ public class EnrollmentsController : ControllerBase
         _enrollmentService = enrollmentService;
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<EnrollmentResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetEnrollmentById(int id)
+    public async Task<IActionResult> GetEnrollmentById([FromRoute] int id)
     {
-        try
-        {
-            var enrollment = await _enrollmentService.GetEnrollmentByIdAsync(id);
+        var enrollment = await _enrollmentService.GetEnrollmentByIdAsync(id);
 
-            if (enrollment == null)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Enrollment with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<EnrollmentResponseModel>.Ok(enrollment));
-        }
-        catch (Exception ex)
+        if (enrollment == null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve enrollment.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Enrollment with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<EnrollmentResponseModel>.Ok(enrollment));
     }
 
     [HttpGet]
@@ -52,19 +50,12 @@ public class EnrollmentsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetEnrollments([FromQuery] QueryParameters parameters)
     {
-        try
-        {
-            var result = await _enrollmentService.GetEnrollmentsAsync(parameters);
-            return result.ToPagedResponse();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to retrieve enrollments.", ex.Message));
-        }
+        var result = await _enrollmentService.GetEnrollmentsAsync(parameters);
+        return result.ToPagedResponse();
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<EnrollmentResponseModel>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
@@ -73,26 +64,22 @@ public class EnrollmentsController : ControllerBase
         try
         {
             var enrollment = await _enrollmentService.CreateEnrollmentAsync(model);
-            return CreatedAtAction(nameof(GetEnrollmentById), new { id = enrollment.EnrollmentId }, ApiResponse<EnrollmentResponseModel>.Ok(enrollment, "Enrollment created successfully"));
+            return CreatedAtAction(nameof(GetEnrollmentById), new { id = enrollment.EnrollmentId, version = HttpContext.GetRequestedApiVersion()?.ToString() }, ApiResponse<EnrollmentResponseModel>.Ok(enrollment, "Enrollment created successfully"));
         }
         catch (ArgumentException ex)
         {
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to create enrollment.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to create enrollment.", ex.Message));
-        }
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<EnrollmentResponseModel>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateEnrollment(int id, [FromBody] EnrollmentUpdateModel model)
+    public async Task<IActionResult> UpdateEnrollment([FromRoute] int id, [FromBody] EnrollmentUpdateModel model)
     {
         try
         {
@@ -110,35 +97,23 @@ public class EnrollmentsController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest,
                 ApiResponse<object>.Fail("Failed to update enrollment.", ex.Message));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to update enrollment.", ex.Message));
-        }
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteEnrollment(int id)
+    public async Task<IActionResult> DeleteEnrollment([FromRoute] int id)
     {
-        try
-        {
-            var deleted = await _enrollmentService.DeleteEnrollmentAsync(id);
+        var deleted = await _enrollmentService.DeleteEnrollmentAsync(id);
 
-            if (!deleted)
-            {
-                return NotFound(ApiResponse<object>.Fail($"Enrollment with ID {id} does not exist."));
-            }
-
-            return Ok(ApiResponse<object>.Ok(new { }, "Enrollment deleted successfully"));
-        }
-        catch (Exception ex)
+        if (!deleted)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                ApiResponse<object>.Fail("Failed to delete enrollment.", ex.Message));
+            return NotFound(ApiResponse<object>.Fail($"Enrollment with ID {id} does not exist."));
         }
+
+        return Ok(ApiResponse<object>.Ok(new { }, "Enrollment deleted successfully"));
     }
 }

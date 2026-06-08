@@ -77,7 +77,7 @@ public class StudentService : IStudentService
         };
     }
 
-    public async Task<StudentResponseModel> CreateStudentAsync(StudentCreateModel model)
+    public async Task<StudentResponseModel> CreateStudentAsync(CreateStudentRequest model)
     {
         // Query maximum StudentId dynamically since DB has no Identity column
         var students = await _studentRepo.GetAllAsync();
@@ -95,7 +95,7 @@ public class StudentService : IStudentService
         return (await GetStudentByIdAsync(student.StudentId))!;
     }
 
-    public async Task<StudentResponseModel?> UpdateStudentAsync(int id, StudentUpdateModel model)
+    public async Task<StudentResponseModel?> UpdateStudentAsync(int id, UpdateStudentRequest model)
     {
         var student = await _studentRepo.GetByIdAsync(id);
 
