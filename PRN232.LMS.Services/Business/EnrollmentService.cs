@@ -3,6 +3,12 @@ using PRN232.LMS.Services.Interfaces;
 using PRN232.LMS.Repositories.Models.QueryModels;
 using PRN232.LMS.Repositories.Entities;
 using PRN232.LMS.Repositories.Interfaces;
+using PRN232.LMS.Services.Models.StudentModels;
+using PRN232.LMS.Services.Models.CourseModels;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace PRN232.LMS.Services.Business;
 
@@ -40,7 +46,7 @@ public class EnrollmentService : IEnrollmentService
     {
         var course = await _courseRepo.GetByIdWithIncludesAsync(
             c => c.CourseId == courseId,
-            "Enrollments", "Enrollments.Student", "Enrollments.Course");
+            "Enrollments", "Enrollments.Student");
 
         if (course == null)
         {
@@ -54,7 +60,7 @@ public class EnrollmentService : IEnrollmentService
     {
         var student = await _studentRepo.GetByIdWithIncludesAsync(
             s => s.StudentId == studentId,
-            "Enrollments", "Enrollments.Course", "Enrollments.Student");
+            "Enrollments", "Enrollments.Course");
 
         if (student == null)
         {
@@ -66,10 +72,14 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<PagedResult<object>> GetEnrollmentsAsync(QueryParameters parameters)
     {
+        TranslateQueryParameters(parameters);
+
         var result = await _enrollmentRepo.GetListAsync(
             parameters,
             !string.IsNullOrWhiteSpace(parameters.Search)
                 ? e => e.Status.Contains(parameters.Search)
+                       || e.Student.FullName.Contains(parameters.Search)
+                       || e.Course.CourseName.Contains(parameters.Search)
                 : null);
 
         if (!string.IsNullOrWhiteSpace(parameters.Fields))
@@ -87,6 +97,56 @@ public class EnrollmentService : IEnrollmentService
             TotalPages = result.TotalPages,
             Items = mappedItems
         };
+    }
+
+    private static void TranslateQueryParameters(QueryParameters parameters)
+    {
+        if (!string.IsNullOrWhiteSpace(parameters.Sort))
+        {
+            var sortParts = parameters.Sort.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var translatedParts = new List<string>();
+            foreach (var part in sortParts)
+            {
+                var trimmed = part.Trim();
+                var isDescending = trimmed.StartsWith("-");
+                var cleanProp = isDescending ? trimmed.Substring(1) : trimmed;
+
+                if (cleanProp.Equals("StudentName", StringComparison.OrdinalIgnoreCase))
+                {
+                    cleanProp = "Student.FullName";
+                }
+                else if (cleanProp.Equals("CourseName", StringComparison.OrdinalIgnoreCase))
+                {
+                    cleanProp = "Course.CourseName";
+                }
+
+                translatedParts.Add(isDescending ? $"-{cleanProp}" : cleanProp);
+            }
+            parameters.Sort = string.Join(",", translatedParts);
+        }
+
+        if (!string.IsNullOrWhiteSpace(parameters.Fields))
+        {
+            var fieldParts = parameters.Fields.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var translatedParts = new List<string>();
+            foreach (var part in fieldParts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Equals("StudentName", StringComparison.OrdinalIgnoreCase))
+                {
+                    translatedParts.Add("Student.FullName as StudentName");
+                }
+                else if (trimmed.Equals("CourseName", StringComparison.OrdinalIgnoreCase))
+                {
+                    translatedParts.Add("Course.CourseName as CourseName");
+                }
+                else
+                {
+                    translatedParts.Add(trimmed);
+                }
+            }
+            parameters.Fields = string.Join(",", translatedParts);
+        }
     }
 
     public async Task<EnrollmentResponseModel> CreateEnrollmentAsync(EnrollmentCreateModel model)
@@ -177,7 +237,21 @@ public class EnrollmentService : IEnrollmentService
             CourseId = businessModel.CourseId,
             CourseName = enrollment.Course?.CourseName,
             EnrollDate = businessModel.EnrollDate,
-            Status = businessModel.Status
+            Status = businessModel.Status,
+            Student = enrollment.Student != null ? new StudentResponseModel
+            {
+                StudentId = enrollment.Student.StudentId,
+                FullName = enrollment.Student.FullName,
+                Email = enrollment.Student.Email,
+                DateOfBirth = enrollment.Student.DateOfBirth
+            } : null,
+            Course = enrollment.Course != null ? new CourseResponseModel
+            {
+                CourseId = enrollment.Course.CourseId,
+                CourseName = enrollment.Course.CourseName,
+                SemesterId = enrollment.Course.SemesterId,
+                SemesterName = enrollment.Course.Semester?.SemesterName
+            } : null
         };
     }
 }

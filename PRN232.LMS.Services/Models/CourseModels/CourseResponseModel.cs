@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PRN232.LMS.Services.Models.SemesterModels;
 
 namespace PRN232.LMS.Services.Models.CourseModels;
 
@@ -11,7 +12,8 @@ public class CourseResponseModel
     public string? SemesterName { get; set; }
     
     // Complete related data
-    //public List<CourseEnrollmentModel> Enrollments { get; set; } = new();
+    public List<CourseEnrollmentModel>? Enrollments { get; set; } = new();
+    public SemesterResponseModel? Semester { get; set; }
 }
 
 public class CourseEnrollmentModel

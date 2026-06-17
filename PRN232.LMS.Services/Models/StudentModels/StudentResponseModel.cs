@@ -11,7 +11,7 @@ public class StudentResponseModel
     public DateTime? DateOfBirth { get; set; }
     
     // Complete related data
-    //public List<StudentEnrollmentModel> Enrollments { get; set; } = new();
+    public List<StudentEnrollmentModel>? Enrollments { get; set; } = new();
 }
 
 public class StudentEnrollmentModel

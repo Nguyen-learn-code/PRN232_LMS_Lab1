@@ -3,6 +3,11 @@ using PRN232.LMS.Services.Interfaces;
 using PRN232.LMS.Repositories.Models.QueryModels;
 using PRN232.LMS.Repositories.Entities;
 using PRN232.LMS.Repositories.Interfaces;
+using PRN232.LMS.Services.Models.SemesterModels;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace PRN232.LMS.Services.Business;
 
@@ -54,10 +59,13 @@ public class CourseService : ICourseService
 
     public async Task<PagedResult<object>> GetCoursesAsync(QueryParameters parameters)
     {
+        TranslateQueryParameters(parameters);
+
         var result = await _courseRepo.GetListAsync(
             parameters,
             !string.IsNullOrWhiteSpace(parameters.Search)
                 ? c => c.CourseName.Contains(parameters.Search)
+                       || c.Semester.SemesterName.Contains(parameters.Search)
                 : null);
 
         if (!string.IsNullOrWhiteSpace(parameters.Fields))
@@ -75,6 +83,48 @@ public class CourseService : ICourseService
             TotalPages = result.TotalPages,
             Items = mappedItems
         };
+    }
+
+    private static void TranslateQueryParameters(QueryParameters parameters)
+    {
+        if (!string.IsNullOrWhiteSpace(parameters.Sort))
+        {
+            var sortParts = parameters.Sort.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var translatedParts = new List<string>();
+            foreach (var part in sortParts)
+            {
+                var trimmed = part.Trim();
+                var isDescending = trimmed.StartsWith("-");
+                var cleanProp = isDescending ? trimmed.Substring(1) : trimmed;
+
+                if (cleanProp.Equals("SemesterName", StringComparison.OrdinalIgnoreCase))
+                {
+                    cleanProp = "Semester.SemesterName";
+                }
+
+                translatedParts.Add(isDescending ? $"-{cleanProp}" : cleanProp);
+            }
+            parameters.Sort = string.Join(",", translatedParts);
+        }
+
+        if (!string.IsNullOrWhiteSpace(parameters.Fields))
+        {
+            var fieldParts = parameters.Fields.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var translatedParts = new List<string>();
+            foreach (var part in fieldParts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Equals("SemesterName", StringComparison.OrdinalIgnoreCase))
+                {
+                    translatedParts.Add("Semester.SemesterName as SemesterName");
+                }
+                else
+                {
+                    translatedParts.Add(trimmed);
+                }
+            }
+            parameters.Fields = string.Join(",", translatedParts);
+        }
     }
 
     public async Task<CourseResponseModel> CreateCourseAsync(CourseCreateModel model)
@@ -150,14 +200,21 @@ public class CourseService : ICourseService
             CourseName = businessModel.CourseName,
             SemesterId = businessModel.SemesterId,
             SemesterName = course.Semester?.SemesterName,
-            //Enrollments = course.Enrollments.Select(e => new CourseEnrollmentModel
-            //{
-            //    EnrollmentId = e.EnrollmentId,
-            //    StudentId = e.StudentId,
-            //    StudentName = e.Student?.FullName,
-            //    Status = e.Status,
-            //    EnrollDate = e.EnrollDate
-            //}).ToList()
+            Semester = course.Semester != null ? new SemesterResponseModel
+            {
+                SemesterId = course.Semester.SemesterId,
+                SemesterName = course.Semester.SemesterName,
+                StartDate = course.Semester.StartDate,
+                EndDate = course.Semester.EndDate
+            } : null,
+            Enrollments = course.Enrollments != null ? course.Enrollments.Select(e => new CourseEnrollmentModel
+            {
+                EnrollmentId = e.EnrollmentId,
+                StudentId = e.StudentId,
+                StudentName = e.Student?.FullName,
+                Status = e.Status,
+                EnrollDate = e.EnrollDate
+            }).ToList() : null
         };
     }
 }
