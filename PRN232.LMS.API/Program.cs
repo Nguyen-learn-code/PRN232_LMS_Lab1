@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 
 namespace PRN232.LMS.API
 {
@@ -20,7 +21,7 @@ namespace PRN232.LMS.API
             builder.Services.AddControllers(options =>
             {
                 options.RespectBrowserAcceptHeader = true;
-                //options.ReturnHttpNotAcceptable = true;
+                options.ReturnHttpNotAcceptable = true;
             })
             .AddXmlSerializerFormatters()
             .AddJsonOptions(options =>
@@ -121,6 +122,7 @@ namespace PRN232.LMS.API
 
             // Register FluentValidation
             builder.Services.AddValidatorsFromAssembly(typeof(PRN232.LMS.Services.Models.StudentModels.CreateStudentRequest).Assembly);
+            builder.Services.AddFluentValidationAutoValidation();
 
             var app = builder.Build();
 
